@@ -1,0 +1,48 @@
+rootProject.name = 'regex-practice'
+
+// Auto-discover every problem directory as a Gradle subproject.
+// Gradle 9 requires ALL intermediate parent projects to have explicit
+// projectDir values, so we register the concept and difficulty directories
+// as projects too (they just carry no sources).
+//
+// Final project tree example:
+//   :01_basics                         → topics/regex/concepts/01_basics
+//   :01_basics:easy                    → .../01_basics/problems/easy
+//   :01_basics:easy:match-literal-string → .../easy/match-literal-string
+
+def conceptsDir = file('topics/regex/concepts')
+
+conceptsDir.listFiles()
+    .findAll { it.isDirectory() }
+    .sort()
+    .each { conceptDir ->
+
+        // ── concept-level project ───────────────────────────────────────────
+        String conceptPath = ":${conceptDir.name}"
+        include conceptPath
+        project(conceptPath).projectDir = conceptDir
+
+        def problemsDir = new File(conceptDir, 'problems')
+        if (!problemsDir.exists()) return
+
+        ['easy', 'medium', 'hard'].each { difficulty ->
+
+            def difficultyDir = new File(problemsDir, difficulty)
+            if (!difficultyDir.exists()) return
+
+            // ── difficulty-level project ────────────────────────────────────
+            String diffPath = ":${conceptDir.name}:${difficulty}"
+            include diffPath
+            project(diffPath).projectDir = difficultyDir
+
+            // ── leaf problem projects ───────────────────────────────────────
+            difficultyDir.listFiles()
+                .findAll { it.isDirectory() }
+                .sort()
+                .each { problemDir ->
+                    String modulePath = ":${conceptDir.name}:${difficulty}:${problemDir.name}"
+                    include modulePath
+                    project(modulePath).projectDir = problemDir
+                }
+        }
+    }

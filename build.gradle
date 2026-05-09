@@ -1,0 +1,33 @@
+// Apply Java + JUnit 5 only to leaf problem projects (those that have a src/ dir).
+// Concept and difficulty intermediate projects carry no source — skip them.
+
+subprojects {
+    // Only leaf problem projects have a src/ directory
+    if (!project.file('src').exists()) return
+
+    apply plugin: 'java'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+        testRuntimeOnly  'org.junit.platform:junit-platform-launcher'
+    }
+
+    test {
+        useJUnitPlatform()
+
+        testLogging {
+            events          'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+            showCauses      true
+        }
+    }
+}
