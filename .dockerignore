@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.gradle/
+build/
+**/build/
+.git/
+*.log
+*.md
+.DS_Store
+fix-data.py
+fix-data.js
+diag.py
+count.js
+test-api.py
+topics/

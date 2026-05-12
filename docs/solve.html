@@ -1,282 +1,394 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Solve — Java Regex Practice</title>
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body class="solve-page">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Solve — Java Regex Practice</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body class="solve-page">
+        <header class="site-header">
+            <div class="header-inner">
+                <div class="logo">
+                    <a href="index.html" class="logo-link">
+                        <span class="logo-icon">⚡</span>
+                        <span class="logo-text">Java Regex Practice</span>
+                    </a>
+                </div>
+                <div class="problem-nav" id="problemNav">
+                    <!-- prev / title / next rendered by JS -->
+                </div>
+                <nav class="header-nav">
+                    <button id="runBtn" class="btn btn-run" disabled>
+                        ▶ Run Tests
+                    </button>
+                </nav>
+            </div>
+        </header>
 
-<header class="site-header">
-  <div class="header-inner">
-    <div class="logo">
-      <a href="index.html" class="logo-link">
-        <span class="logo-icon">⚡</span>
-        <span class="logo-text">Java Regex Practice</span>
-      </a>
-    </div>
-    <div class="problem-nav" id="problemNav">
-      <!-- prev / title / next rendered by JS -->
-    </div>
-    <nav class="header-nav">
-      <button id="runBtn" class="btn btn-run" disabled>▶ Run Tests</button>
-    </nav>
-  </div>
-</header>
+        <!-- Split layout -->
+        <div class="solve-layout">
+            <!-- Left panel: problem description -->
+            <div class="panel panel-description" id="descPanel">
+                <div class="panel-tabs">
+                    <button class="tab-btn active" data-tab="description">
+                        Description
+                    </button>
+                    <button class="tab-btn" data-tab="hints">Hints</button>
+                </div>
 
-<!-- Split layout -->
-<div class="solve-layout">
+                <div class="tab-content active" id="tab-description">
+                    <div class="problem-meta" id="problemMeta"></div>
+                    <div class="problem-body" id="problemBody"></div>
+                    <div class="test-cases" id="testCasesPanel"></div>
+                </div>
 
-  <!-- Left panel: problem description -->
-  <div class="panel panel-description" id="descPanel">
-    <div class="panel-tabs">
-      <button class="tab-btn active" data-tab="description">Description</button>
-      <button class="tab-btn" data-tab="hints">Hints</button>
-    </div>
+                <div class="tab-content" id="tab-hints">
+                    <div class="hints-body" id="hintsBody">
+                        <p class="hint-intro">
+                            Hints are progressive — read only as far as you
+                            need.
+                        </p>
+                        <div id="hintsList"></div>
+                    </div>
+                </div>
+            </div>
 
-    <div class="tab-content active" id="tab-description">
-      <div class="problem-meta" id="problemMeta"></div>
-      <div class="problem-body" id="problemBody"></div>
-      <div class="test-cases" id="testCasesPanel"></div>
-    </div>
+            <!-- Resize handle -->
+            <div class="resize-handle" id="resizeHandle"></div>
 
-    <div class="tab-content" id="tab-hints">
-      <div class="hints-body" id="hintsBody">
-        <p class="hint-intro">Hints are progressive — read only as far as you need.</p>
-        <div id="hintsList"></div>
-      </div>
-    </div>
-  </div>
+            <!-- Right panel: editor + results -->
+            <div class="panel panel-editor" id="editorPanel">
+                <div class="editor-toolbar">
+                    <span class="lang-badge">Java</span>
+                    <button
+                        class="btn btn-sm btn-ghost"
+                        id="resetBtn"
+                        title="Reset to starter code"
+                    >
+                        ↺ Reset
+                    </button>
+                </div>
+                <div id="monacoContainer" class="monaco-container"></div>
 
-  <!-- Resize handle -->
-  <div class="resize-handle" id="resizeHandle"></div>
+                <!-- Results -->
+                <div
+                    class="results-panel"
+                    id="resultsPanel"
+                    style="display: none"
+                >
+                    <div class="results-header">
+                        <span id="resultsSummary"></span>
+                        <button class="btn btn-sm btn-ghost" id="closeResults">
+                            ✕
+                        </button>
+                    </div>
+                    <div id="resultsBody" class="results-body"></div>
+                </div>
+            </div>
+        </div>
 
-  <!-- Right panel: editor + results -->
-  <div class="panel panel-editor" id="editorPanel">
-    <div class="editor-toolbar">
-      <span class="lang-badge">Java</span>
-      <button class="btn btn-sm btn-ghost" id="resetBtn" title="Reset to starter code">↺ Reset</button>
-    </div>
-    <div id="monacoContainer" class="monaco-container"></div>
+        <!-- Monaco Editor CDN -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+        <script src="js/data.js"></script>
+        <script src="js/runner.js"></script>
+        <script>
+            (function () {
+                // ── Parse URL params ─────────────────────────────────────────────────────
+                const params = new URLSearchParams(window.location.search);
+                const conceptKey = params.get("concept");
+                const problemId = params.get("id");
 
-    <!-- Results -->
-    <div class="results-panel" id="resultsPanel" style="display:none;">
-      <div class="results-header">
-        <span id="resultsSummary"></span>
-        <button class="btn btn-sm btn-ghost" id="closeResults">✕</button>
-      </div>
-      <div id="resultsBody" class="results-body"></div>
-    </div>
-  </div>
+                const concept = PROBLEMS[conceptKey];
+                const problem = concept?.problems.find(
+                    (p) => p.id === problemId,
+                );
 
-</div>
+                if (!problem) {
+                    document.body.innerHTML =
+                        '<div style="padding:40px;color:#e6edf3">Problem not found. <a href="index.html">Go back</a></div>';
+                    return;
+                }
 
-<!-- Monaco Editor CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
-<script src="js/data.js"></script>
-<script src="js/runner.js"></script>
-<script>
-(function () {
-  // ── Parse URL params ─────────────────────────────────────────────────────
-  const params     = new URLSearchParams(window.location.search);
-  const conceptKey = params.get('concept');
-  const problemId  = params.get('id');
+                // ── Problem nav (prev / next) ─────────────────────────────────────────────
+                const allProblems = Object.entries(PROBLEMS).flatMap(
+                    ([ck, c]) =>
+                        c.problems.map((p) => ({ conceptKey: ck, ...p })),
+                );
+                const idx = allProblems.findIndex(
+                    (p) => p.conceptKey === conceptKey && p.id === problemId,
+                );
+                const prev = allProblems[idx - 1];
+                const next = allProblems[idx + 1];
 
-  const concept = PROBLEMS[conceptKey];
-  const problem = concept?.problems.find(p => p.id === problemId);
-
-  if (!problem) {
-    document.body.innerHTML = '<div style="padding:40px;color:#e6edf3">Problem not found. <a href="index.html">Go back</a></div>';
-    return;
-  }
-
-  // ── Problem nav (prev / next) ─────────────────────────────────────────────
-  const allProblems = Object.entries(PROBLEMS).flatMap(([ck, c]) =>
-    c.problems.map(p => ({ conceptKey: ck, ...p }))
-  );
-  const idx = allProblems.findIndex(p => p.conceptKey === conceptKey && p.id === problemId);
-  const prev = allProblems[idx - 1];
-  const next = allProblems[idx + 1];
-
-  document.getElementById('problemNav').innerHTML = `
+                document.getElementById("problemNav").innerHTML = `
     ${prev ? `<a href="solve.html?concept=${prev.conceptKey}&id=${prev.id}" class="nav-arrow" title="${prev.title}">‹</a>` : '<span class="nav-arrow disabled">‹</span>'}
     <span class="nav-title">${problem.title}</span>
     ${next ? `<a href="solve.html?concept=${next.conceptKey}&id=${next.id}" class="nav-arrow" title="${next.title}">›</a>` : '<span class="nav-arrow disabled">›</span>'}
   `;
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    });
-  });
+                // ── Tabs ──────────────────────────────────────────────────────────────────
+                document.querySelectorAll(".tab-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        document
+                            .querySelectorAll(".tab-btn")
+                            .forEach((b) => b.classList.remove("active"));
+                        document
+                            .querySelectorAll(".tab-content")
+                            .forEach((c) => c.classList.remove("active"));
+                        btn.classList.add("active");
+                        document
+                            .getElementById("tab-" + btn.dataset.tab)
+                            .classList.add("active");
+                    });
+                });
 
-  // ── Render problem description ────────────────────────────────────────────
-  const diffBadge = { easy: 'badge-easy', medium: 'badge-medium', hard: 'badge-hard' };
+                // ── Render problem description ────────────────────────────────────────────
+                const diffBadge = {
+                    easy: "badge-easy",
+                    medium: "badge-medium",
+                    hard: "badge-hard",
+                };
 
-  document.getElementById('problemMeta').innerHTML = `
+                document.getElementById("problemMeta").innerHTML = `
     <span class="badge ${diffBadge[problem.difficulty]}">${problem.difficulty}</span>
     <span class="concept-tag">${concept.label}</span>
   `;
 
-  document.getElementById('problemBody').innerHTML = `
+                document.getElementById("problemBody").innerHTML = `
     <h2 class="problem-title-lg">${problem.title}</h2>
-    <div class="description-text">${problem.description.replace(/\n/g, '<br>')}</div>
+    <div class="description-text">${problem.description.replace(/\n/g, "<br>")}</div>
   `;
 
-  // Test cases preview
-  const tcHtml = problem.tests.map(t => `
+                // Test cases preview
+                const tcHtml = problem.tests
+                    .map(
+                        (t) => `
     <div class="tc-row">
       <span class="tc-name">${t.name}</span>
       <code class="tc-args">${escHtml(t.args)}</code>
       <span class="tc-arrow">→</span>
       <code class="tc-expected">${escHtml(t.expected)}</code>
     </div>
-  `).join('');
-  document.getElementById('testCasesPanel').innerHTML = `
+  `,
+                    )
+                    .join("");
+                document.getElementById("testCasesPanel").innerHTML = `
     <h3 class="tc-heading">Test Cases</h3>
     <div class="tc-list">${tcHtml}</div>
   `;
 
-  // Hints
-  if (problem.hints && problem.hints.length) {
-    document.getElementById('hintsList').innerHTML = problem.hints.map((h, i) => `
+                // Hints
+                if (problem.hints && problem.hints.length) {
+                    document.getElementById("hintsList").innerHTML =
+                        problem.hints
+                            .map(
+                                (h, i) => `
       <details class="hint-item">
         <summary>Hint ${i + 1}</summary>
         <p>${h}</p>
       </details>
-    `).join('');
-  } else {
-    document.getElementById('hintsList').innerHTML = '<p>Open <code>hints.md</code> in the repo for detailed hints.</p>';
-  }
+    `,
+                            )
+                            .join("");
+                } else {
+                    document.getElementById("hintsList").innerHTML =
+                        "<p>Open <code>hints.md</code> in the repo for detailed hints.</p>";
+                }
 
-  // ── Monaco editor ─────────────────────────────────────────────────────────
-  let editor;
-  const starterCode = problem.starterCode;
+                // ── Monaco editor ─────────────────────────────────────────────────────────
+                let editor;
+                const starterCode = problem.starterCode;
 
-  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
-  require(['vs/editor/editor.main'], function () {
-    editor = monaco.editor.create(document.getElementById('monacoContainer'), {
-      value: starterCode,
-      language: 'java',
-      theme: 'vs-dark',
-      fontSize: 14,
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      automaticLayout: true,
-      lineNumbers: 'on',
-      wordWrap: 'on',
-      tabSize: 4,
-    });
+                require.config({
+                    paths: {
+                        vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs",
+                    },
+                });
+                require(["vs/editor/editor.main"], function () {
+                    editor = monaco.editor.create(
+                        document.getElementById("monacoContainer"),
+                        {
+                            value: starterCode,
+                            language: "java",
+                            theme: "vs-dark",
+                            fontSize: 14,
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            lineNumbers: "on",
+                            wordWrap: "on",
+                            tabSize: 4,
+                        },
+                    );
 
-    document.getElementById('runBtn').disabled = false;
-  });
+                    document.getElementById("runBtn").disabled = false;
+                });
 
-  // Reset
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (editor) editor.setValue(starterCode);
-    document.getElementById('resultsPanel').style.display = 'none';
-  });
+                // Reset
+                document
+                    .getElementById("resetBtn")
+                    .addEventListener("click", () => {
+                        if (editor) editor.setValue(starterCode);
+                        document.getElementById("resultsPanel").style.display =
+                            "none";
+                    });
 
-  // ── Run button ────────────────────────────────────────────────────────────
-  document.getElementById('runBtn').addEventListener('click', async () => {
-    if (!editor) return;
-    const userCode = editor.getValue();
-    const btn = document.getElementById('runBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Running…';
+                // ── Run button ────────────────────────────────────────────────────────────
+                document
+                    .getElementById("runBtn")
+                    .addEventListener("click", async () => {
+                        if (!editor) return;
+                        const userCode = editor.getValue();
+                        const btn = document.getElementById("runBtn");
+                        btn.disabled = true;
+                        btn.textContent = "⏳ Running…";
 
-    const resultsPanel = document.getElementById('resultsPanel');
-    const resultsBody  = document.getElementById('resultsBody');
-    const summary      = document.getElementById('resultsSummary');
+                        const resultsPanel =
+                            document.getElementById("resultsPanel");
+                        const resultsBody =
+                            document.getElementById("resultsBody");
+                        const summary =
+                            document.getElementById("resultsSummary");
 
-    resultsPanel.style.display = 'flex';
-    resultsBody.innerHTML = '<div class="running-msg">Sending to sandbox…</div>';
-    summary.textContent = '';
+                        resultsPanel.style.display = "flex";
+                        resultsBody.innerHTML =
+                            '<div class="running-msg">Sending to sandbox…</div>';
+                        summary.textContent = "";
 
-    try {
-      const { output, error } = await runInSandbox(problem, userCode);
-      renderResults(output, error, problem.tests, resultsBody, summary);
-    } catch (e) {
-      resultsBody.innerHTML = `<div class="result-error">Network error: ${e.message}</div>`;
-    }
+                        try {
+                            const { output, error } = await runInSandbox(
+                                problem,
+                                userCode,
+                            );
+                            renderResults(
+                                output,
+                                error,
+                                problem.tests,
+                                resultsBody,
+                                summary,
+                            );
+                        } catch (e) {
+                            resultsBody.innerHTML = `<div class="result-error">Network error: ${e.message}</div>`;
+                        }
 
-    btn.disabled = false;
-    btn.textContent = '▶ Run Tests';
-  });
+                        btn.disabled = false;
+                        btn.textContent = "▶ Run Tests";
+                    });
 
-  document.getElementById('closeResults').addEventListener('click', () => {
-    document.getElementById('resultsPanel').style.display = 'none';
-  });
+                document
+                    .getElementById("closeResults")
+                    .addEventListener("click", () => {
+                        document.getElementById("resultsPanel").style.display =
+                            "none";
+                    });
 
-  // ── Resize handle ─────────────────────────────────────────────────────────
-  const handle = document.getElementById('resizeHandle');
-  const descP  = document.getElementById('descPanel');
-  let dragging = false;
-  handle.addEventListener('mousedown', () => { dragging = true; });
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const pct = (e.clientX / window.innerWidth) * 100;
-    if (pct > 20 && pct < 75) descP.style.width = pct + '%';
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
+                // ── Resize handle ─────────────────────────────────────────────────────────
+                const handle = document.getElementById("resizeHandle");
+                const descP = document.getElementById("descPanel");
+                let dragging = false;
+                handle.addEventListener("mousedown", () => {
+                    dragging = true;
+                });
+                document.addEventListener("mousemove", (e) => {
+                    if (!dragging) return;
+                    const pct = (e.clientX / window.innerWidth) * 100;
+                    if (pct > 20 && pct < 75) descP.style.width = pct + "%";
+                });
+                document.addEventListener("mouseup", () => {
+                    dragging = false;
+                });
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+                // ── Helpers ───────────────────────────────────────────────────────────────
+                function escHtml(s) {
+                    return String(s)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;");
+                }
 
-  function renderResults(output, compileErr, tests, body, summary) {
-    if (compileErr) {
-      body.innerHTML = `<div class="result-error"><strong>Compile error:</strong><pre>${escHtml(compileErr)}</pre></div>`;
-      summary.innerHTML = '<span class="fail-text">✗ Compile error</span>';
-      return;
-    }
+                function renderResults(
+                    output,
+                    compileErr,
+                    tests,
+                    body,
+                    summary,
+                ) {
+                    if (compileErr) {
+                        body.innerHTML = `<div class="result-error"><strong>Compile error:</strong><pre>${escHtml(compileErr)}</pre></div>`;
+                        summary.innerHTML =
+                            '<span class="fail-text">✗ Compile error</span>';
+                        return;
+                    }
 
-    const lines = (output || '').split('\n');
+                    const lines = (output || "").split("\n");
 
-    if (lines.some(l => l.includes('NOT_IMPLEMENTED'))) {
-      body.innerHTML = `<div class="result-not-impl">⚠ Method not yet implemented — replace the <code>throw</code> with your solution.</div>`;
-      summary.innerHTML = '<span class="warn-text">Not implemented</span>';
-      return;
-    }
+                    if (lines.some((l) => l.includes("WEB_NO_EXECUTOR"))) {
+                        body.innerHTML = `
+        <div class="result-not-impl" style="line-height:1.9">
+          <strong>⚙ Code execution needs a runtime — choose one:</strong><br><br>
+          <b>🖥 Desktop app</b> (uses your local JDK)<br>
+          <code style="font-size:12px">npm install &amp;&amp; npm start</code><br><br>
+          <b>🐳 Docker</b> (Java 17 bundled, no install needed)<br>
+          <code style="font-size:12px">docker-compose up</code>
+          then open <a href="http://localhost:3000" target="_blank">localhost:3000</a>
+        </div>`;
+                        summary.innerHTML =
+                            '<span class="warn-text">⚙ No runtime here</span>';
+                        return;
+                    }
 
-    if (lines.some(l => l.startsWith('EXCEPTION:'))) {
-      const msg = lines.find(l => l.startsWith('EXCEPTION:')) || '';
-      body.innerHTML = `<div class="result-error"><strong>Runtime error:</strong><pre>${escHtml(msg)}</pre></div>`;
-      summary.innerHTML = '<span class="fail-text">✗ Runtime error</span>';
-      return;
-    }
+                    if (lines.some((l) => l.includes("NOT_IMPLEMENTED"))) {
+                        body.innerHTML = `<div class="result-not-impl">⚠ Method not yet implemented — replace the <code>throw</code> with your solution.</div>`;
+                        summary.innerHTML =
+                            '<span class="warn-text">Not implemented</span>';
+                        return;
+                    }
 
-    // Parse PASS/FAIL lines
-    const rows = lines.filter(l => l.startsWith('PASS:') || l.startsWith('FAIL:'));
-    let passed = 0, failed = 0;
+                    if (lines.some((l) => l.startsWith("EXCEPTION:"))) {
+                        const msg =
+                            lines.find((l) => l.startsWith("EXCEPTION:")) || "";
+                        body.innerHTML = `<div class="result-error"><strong>Runtime error:</strong><pre>${escHtml(msg)}</pre></div>`;
+                        summary.innerHTML =
+                            '<span class="fail-text">✗ Runtime error</span>';
+                        return;
+                    }
 
-    const rowsHtml = rows.map(line => {
-      if (line.startsWith('PASS:')) {
-        passed++;
-        return `<div class="result-row pass"><span class="result-icon">✓</span><span>${escHtml(line.slice(6))}</span></div>`;
-      } else {
-        failed++;
-        const detail = lines.slice(lines.indexOf(line) + 1).slice(0, 2).join('\n');
-        return `<div class="result-row fail"><span class="result-icon">✗</span><div><div>${escHtml(line.slice(6))}</div><pre class="diff-pre">${escHtml(detail)}</pre></div></div>`;
-      }
-    }).join('');
+                    // Parse PASS/FAIL lines
+                    const rows = lines.filter(
+                        (l) => l.startsWith("PASS:") || l.startsWith("FAIL:"),
+                    );
+                    let passed = 0,
+                        failed = 0;
 
-    body.innerHTML = rowsHtml || `<pre class="raw-output">${escHtml(output)}</pre>`;
+                    const rowsHtml = rows
+                        .map((line) => {
+                            if (line.startsWith("PASS:")) {
+                                passed++;
+                                return `<div class="result-row pass"><span class="result-icon">✓</span><span>${escHtml(line.slice(6))}</span></div>`;
+                            } else {
+                                failed++;
+                                const detail = lines
+                                    .slice(lines.indexOf(line) + 1)
+                                    .slice(0, 2)
+                                    .join("\n");
+                                return `<div class="result-row fail"><span class="result-icon">✗</span><div><div>${escHtml(line.slice(6))}</div><pre class="diff-pre">${escHtml(detail)}</pre></div></div>`;
+                            }
+                        })
+                        .join("");
 
-    const total = passed + failed;
-    if (failed === 0 && total > 0) {
-      summary.innerHTML = `<span class="pass-text">✓ All ${total} tests passed</span>`;
-    } else {
-      summary.innerHTML = `<span class="fail-text">${passed}/${total} tests passed</span>`;
-    }
-  }
-})();
-</script>
-</body>
+                    body.innerHTML =
+                        rowsHtml ||
+                        `<pre class="raw-output">${escHtml(output)}</pre>`;
+
+                    const total = passed + failed;
+                    if (failed === 0 && total > 0) {
+                        summary.innerHTML = `<span class="pass-text">✓ All ${total} tests passed</span>`;
+                    } else {
+                        summary.innerHTML = `<span class="fail-text">${passed}/${total} tests passed</span>`;
+                    }
+                }
+            })();
+        </script>
+    </body>
 </html>
