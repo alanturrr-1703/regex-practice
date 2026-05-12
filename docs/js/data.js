@@ -558,7 +558,7 @@ const PROBLEMS = {
         description: 'Count occurrences of the 14 regex metacharacters: . * + ? ^ $ { } [ ] | ( ) \\\\\n\nBuild a character class inside [...] that contains all 14, properly escaped.',
         returnType: 'int', method: 'countSpecialChars',
         starterCode: `public int countSpecialChars(String input) {
-    // TODO: [\\\\]\\\\[.*+?^${}|()\\\\\\\\ ] inside a character class
+    // TODO: [\\]\\[.*+?^\${}|()\\\\ ] inside a character class
     // Watch the escaping: \\\\ inside [] needs \\\\\\\\ in Java source
     throw new UnsupportedOperationException("TODO");
 }`,
@@ -587,7 +587,7 @@ const PROBLEMS = {
       },
       {
         id: 'java-escape-sequence-validator', difficulty: 'medium', title: 'Java Escape Validator',
-        description: 'Given a string (the content of a Java string literal), return true if all backslash sequences are valid Java escapes: \\\\n \\\\t \\\\r \\\\\\\\ \\\\" \\\\' \\\\0\n\nA lone backslash at end is invalid. Any \\\\x for unknown x is invalid.',
+        description: 'Given a string (the content of a Java string literal), return true if all backslash sequences are valid Java escapes: \\\\n \\\\t \\\\r \\\\\\\\ \\\\" \\\\\' \\\\0\n\nA lone backslash at end is invalid. Any \\\\x for unknown x is invalid.',
         returnType: 'boolean', method: 'hasOnlyValidEscapes',
         starterCode: `public boolean hasOnlyValidEscapes(String input) {
     // TODO: find any \\\\ NOT followed by [ntr\\\\"'0] → invalid
@@ -664,7 +664,7 @@ const PROBLEMS = {
       },
       {
         id: 'extract-quoted-strings', difficulty: 'medium', title: 'Extract Quoted Strings',
-        description: 'Extract content of single-quoted strings. Two methods:\n1. extractSimpleQuoted — lazy \'.*?\', no escaped quotes\n2. extractRobustQuoted — handles \\\\' inside using [^\'\\\\\\\\]|\\\\\\\\.\n\nImplement BOTH. The sandbox tests the simple version.',
+        description: 'Extract content of single-quoted strings. Two methods:\n1. extractSimpleQuoted: lazy \'.*?\' (no escaped quotes)\n2. extractRobustQuoted: handles escaped single-quotes \\\'  inside\n\nImplement BOTH. Sandbox tests the simple version.',
         returnType: 'List', method: 'extractSimpleQuoted',
         starterCode: `public List<String> extractSimpleQuoted(String input) {
     // TODO: '(.*?)' — lazy, stops at first closing quote
