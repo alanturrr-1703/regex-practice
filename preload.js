@@ -38,4 +38,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   /** Verify Java is installed. */
   checkJava: () => ipcRenderer.invoke("check-java"),
+
+  /**
+   * Read README.md or notes.md for a concept.
+   * @param {{ conceptKey: string, fileType: 'readme'|'notes' }} opts
+   * @returns {Promise<{content?: string, error?: string}>}
+   */
+  readMarkdown: ({ conceptKey, fileType }) =>
+    ipcRenderer.invoke("read-markdown", { conceptKey, fileType }),
 });

@@ -248,3 +248,24 @@ ipcMain.handle("check-java", async () => {
     version: match ? match[1] : combined.slice(0, 80),
   };
 });
+
+// ── IPC: read markdown files from the concepts/ tree ─────────────────────────
+//  fileType: 'readme' → README.md
+//            'notes'  → notes.md
+
+ipcMain.handle("read-markdown", (_event, { conceptKey, fileType }) => {
+  const filename = fileType === "notes" ? "notes.md" : "README.md";
+  const filePath = path.join(
+    __dirname,
+    "topics",
+    "regex",
+    "concepts",
+    conceptKey,
+    filename,
+  );
+  try {
+    return { content: fs.readFileSync(filePath, "utf8"), filename };
+  } catch (e) {
+    return { error: `Could not read ${filename}: ${e.message}` };
+  }
+});

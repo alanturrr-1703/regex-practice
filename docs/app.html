@@ -115,6 +115,12 @@
         <div class="concept-header" style="border-left: 3px solid ${concept.color}">
           <div class="concept-title">${concept.label}</div>
           <div class="concept-desc">${concept.description}</div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <a href="learn.html?concept=${encodeURIComponent(conceptKey)}&tab=readme"
+               class="read-btn" title="Read overview">📋 Overview</a>
+            <a href="learn.html?concept=${encodeURIComponent(conceptKey)}&tab=notes"
+               class="read-btn" title="Read deep notes">📖 Deep Notes</a>
+          </div>
         </div>
         <ul class="problem-list">
           ${matchingProblems

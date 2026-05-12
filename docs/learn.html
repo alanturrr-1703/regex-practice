@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learn — Java Regex Practice</title>
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Markdown renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+
+  <!-- Syntax highlighting (dark GitHub theme) -->
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+
+  <style>
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .learn-layout {
+      display: flex;
+      height: calc(100vh - var(--header-h));
+      margin-top: var(--header-h);
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ToC ─────────────────────────────────────────────── */
+    .toc-panel {
+      width: 220px;
+      min-width: 180px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+    .toc-heading {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--text-muted);
+      padding: 0 16px 10px;
+    }
+    .toc-item {
+      display: block; padding: 5px 16px; font-size: 12px;
+      color: var(--text-muted); cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all .12s; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      text-decoration: none;
+    }
+    .toc-item:hover { color: var(--text); background: var(--surface2); text-decoration: none; }
+    .toc-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(88,166,255,.06); }
+    .toc-item.h3 { padding-left: 26px; font-size: 11px; }
+
+    /* ── Content area ────────────────────────────────────────────── */
+    .content-panel {
+      flex: 1; overflow-y: auto; padding: 40px 48px;
+      background: var(--bg);
+    }
+
+    /* ── Markdown body ────────────────────────────────────────────── */
+    .markdown-body {
+      max-width: 780px; margin: 0 auto;
+      font-size: 15px; line-height: 1.75; color: var(--text);
+    }
+    .markdown-body h1 {
+      font-size: 2rem; font-weight: 800; margin: 0 0 24px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+    .markdown-body h2 {
+      font-size: 1.35rem; font-weight: 700; margin: 40px 0 16px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      scroll-margin-top: 70px;
+    }
+    .markdown-body h3 {
+      font-size: 1.1rem; font-weight: 600; margin: 28px 0 12px;
+      scroll-margin-top: 70px;
+    }
+    .markdown-body h4 { font-size: 1rem; font-weight: 600; margin: 20px 0 10px; }
+    .markdown-body p  { margin: 0 0 16px; }
+    .markdown-body ul, .markdown-body ol { margin: 0 0 16px; padding-left: 28px; }
+    .markdown-body li { margin-bottom: 5px; }
+    .markdown-body li > p { margin-bottom: 4px; }
+    .markdown-body strong { color: #e6edf3; }
+    .markdown-body em    { color: var(--text-muted); }
+    .markdown-body a     { color: var(--blue); }
+
+    /* Inline code */
+    .markdown-body :not(pre) > code {
+      font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      font-size: 12.5px;
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 1px 6px; border-radius: 4px; color: #e06c75;
+    }
+
+    /* Code blocks */
+    .markdown-body pre {
+      margin: 16px 0 24px; border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto; font-size: 13px; line-height: 1.55;
+    }
+    .markdown-body pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+    .hljs { padding: 20px 22px !important; background: #0d1117 !important; }
+
+    /* Blockquote */
+    .markdown-body blockquote {
+      margin: 20px 0; padding: 12px 20px;
+      border-left: 4px solid var(--blue);
+      background: rgba(88,166,255,.06); border-radius: 0 6px 6px 0;
+      color: var(--text-muted); font-style: italic;
+    }
+    .markdown-body blockquote p { margin: 0; }
+
+    /* Tables */
+    .markdown-body table {
+      width: 100%; border-collapse: collapse; margin: 16px 0 24px;
+      font-size: 13px;
+    }
+    .markdown-body th {
+      background: var(--surface2); padding: 10px 14px; text-align: left;
+      border: 1px solid var(--border); font-weight: 600; font-size: 12px;
+    }
+    .markdown-body td { padding: 9px 14px; border: 1px solid var(--border); }
+    .markdown-body tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+    /* HR */
+    .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+
+    /* ── Header tabs ─────────────────────────────────────────────── */
+    .learn-header { display: flex; align-items: center; gap: 0; flex: 1; }
+    .tab-pill {
+      padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: transparent;
+      color: var(--text-muted); transition: all .15s; margin-right: 6px;
+    }
+    .tab-pill.active { background: var(--blue); color: #000; border-color: var(--blue); }
+    .tab-pill:hover:not(.active) { color: var(--text); border-color: var(--text-muted); }
+
+    .concept-breadcrumb {
+      font-size: 13px; color: var(--text-muted); margin-right: 16px;
+      white-space: nowrap;
+    }
+    .concept-breadcrumb strong { color: var(--text); }
+
+    .btn-problems {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      background: var(--green); color: #000; white-space: nowrap;
+      text-decoration: none; transition: opacity .15s;
+    }
+    .btn-problems:hover { opacity: .85; text-decoration: none; }
+
+    .concept-nav { display: flex; align-items: center; gap: 4px; }
+    .nav-pill {
+      padding: 5px 10px; border-radius: 6px; font-size: 12px;
+      border: 1px solid var(--border); color: var(--text-muted);
+      background: transparent; cursor: pointer; text-decoration: none;
+    }
+    .nav-pill:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; }
+
+    /* Loading / error */
+    .loading-msg, .error-msg {
+      text-align: center; padding: 80px 40px; color: var(--text-muted); font-size: 14px;
+    }
+    .error-msg { color: var(--red); }
+
+    /* Only available in desktop */
+    .desktop-only {
+      max-width: 500px; margin: 80px auto; text-align: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 40px;
+    }
+    .desktop-only h2 { font-size: 1.2rem; margin-bottom: 12px; }
+    .desktop-only p  { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="app.html" class="logo-link">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Java Regex Practice</span>
+    </a>
+
+    <div class="learn-header" id="learnHeader">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</header>
+
+<div class="learn-layout">
+  <!-- Sidebar table-of-contents -->
+  <nav class="toc-panel" id="tocPanel">
+    <div class="toc-heading">On this page</div>
+    <div id="tocList"></div>
+  </nav>
+
+  <!-- Main reading area -->
+  <div class="content-panel" id="contentPanel">
+    <div class="loading-msg" id="loadingMsg">Loading…</div>
+    <article class="markdown-body" id="markdownBody" style="display:none"></article>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script>
+(function () {
+  const params     = new URLSearchParams(window.location.search);
+  const conceptKey = params.get('concept') || '01_basics';
+  let   activeTab  = params.get('tab') || 'readme';   // 'readme' | 'notes'
+
+  const concept = PROBLEMS[conceptKey];
+
+  // ── All concept keys in order ────────────────────────────────────────────
+  const allKeys    = Object.keys(PROBLEMS);
+  const currentIdx = allKeys.indexOf(conceptKey);
+  const prevKey    = allKeys[currentIdx - 1];
+  const nextKey    = allKeys[currentIdx + 1];
+
+  function navUrl(key, tab) {
+    return `learn.html?concept=${encodeURIComponent(key)}&tab=${tab}`;
+  }
+
+  // ── Render header ─────────────────────────────────────────────────────────
+  function renderHeader() {
+    document.getElementById('learnHeader').innerHTML = `
+      <span class="concept-breadcrumb">
+        <strong>${concept ? concept.label : conceptKey}</strong>
+      </span>
+      <button class="tab-pill ${activeTab === 'readme' ? 'active' : ''}" onclick="switchTab('readme')">📋 Overview</button>
+      <button class="tab-pill ${activeTab === 'notes'  ? 'active' : ''}" onclick="switchTab('notes')">📖 Deep Notes</button>
+      <span style="flex:1"></span>
+      <div class="concept-nav">
+        ${prevKey ? `<a href="${navUrl(prevKey, activeTab)}" class="nav-pill" title="${PROBLEMS[prevKey].label}">‹ Prev</a>` : ''}
+        ${nextKey ? `<a href="${navUrl(nextKey, activeTab)}" class="nav-pill" title="${PROBLEMS[nextKey].label}">Next ›</a>` : ''}
+      </div>
+      <a href="app.html?concept=${encodeURIComponent(conceptKey)}" class="btn-problems" style="margin-left:10px">
+        ✎ Problems →
+      </a>
+    `;
+  }
+
+  window.switchTab = function(tab) {
+    activeTab = tab;
+    renderHeader();
+    loadContent();
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+  };
+
+  // ── Build table-of-contents from rendered HTML ───────────────────────────
+  function buildToC(container) {
+    const tocList = document.getElementById('tocList');
+    tocList.innerHTML = '';
+    const headings = container.querySelectorAll('h2, h3');
+    if (headings.length === 0) {
+      document.getElementById('tocPanel').style.display = 'none';
+      return;
+    }
+    document.getElementById('tocPanel').style.display = '';
+    headings.forEach((h, i) => {
+      if (!h.id) h.id = 'heading-' + i;
+      const a = document.createElement('a');
+      a.className = 'toc-item' + (h.tagName === 'H3' ? ' h3' : '');
+      a.href      = '#' + h.id;
+      a.textContent = h.textContent;
+      a.addEventListener('click', () => {
+        document.querySelectorAll('.toc-item').forEach(x => x.classList.remove('active'));
+        a.classList.add('active');
+      });
+      tocList.appendChild(a);
+    });
+
+    // Highlight active heading on scroll
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const id = e.target.id;
+          document.querySelectorAll('.toc-item').forEach(x => {
+            x.classList.toggle('active', x.hash === '#' + id);
+          });
+        }
+      });
+    }, { rootMargin: '-10% 0% -80% 0%', threshold: 0 });
+    headings.forEach(h => observer.observe(h));
+  }
+
+  // ── Configure marked with highlight.js ───────────────────────────────────
+  const renderer = new marked.Renderer();
+  renderer.code = function({ text, lang }) {
+    const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext';
+    const highlighted = language === 'plaintext'
+      ? hljs.highlightAuto(text).value
+      : hljs.highlight(text, { language }).value;
+    return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+  };
+  marked.use({ renderer, gfm: true, breaks: false });
+
+  // ── Load and render markdown ──────────────────────────────────────────────
+  async function loadContent() {
+    const body     = document.getElementById('markdownBody');
+    const loadMsg  = document.getElementById('loadingMsg');
+    body.style.display = 'none';
+    loadMsg.style.display = 'block';
+    loadMsg.className = 'loading-msg';
+    loadMsg.textContent = 'Loading…';
+
+    if (!window.electronAPI || !window.electronAPI.isElectron) {
+      loadMsg.className = '';
+      loadMsg.innerHTML = `
+        <div class="desktop-only">
+          <h2>📖 Available in the Desktop App</h2>
+          <p>The concept notes and deep reading content are stored as Markdown files
+             in the repository. They are only accessible in the Electron desktop app.</p>
+          <a href="https://github.com/alanturrr-1703/regex-practice/releases/latest"
+             class="btn-problems" target="_blank">Download the Desktop App</a>
+        </div>`;
+      return;
+    }
+
+    const result = await window.electronAPI.readMarkdown({
+      conceptKey, fileType: activeTab
+    });
+
+    if (result.error) {
+      loadMsg.className = 'error-msg';
+      loadMsg.textContent = result.error;
+      return;
+    }
+
+    const html = marked.parse(result.content);
+    body.innerHTML = html;
+    loadMsg.style.display = 'none';
+    body.style.display = 'block';
+    buildToC(body);
+
+    // Scroll to top on tab switch
+    document.getElementById('contentPanel').scrollTop = 0;
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  renderHeader();
+  loadContent();
+})();
+</script>
+</body>
+</html>
