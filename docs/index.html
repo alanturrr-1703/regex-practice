@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Java Regex Practice</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Java Regex Practice</span>
+    </div>
+    <nav class="header-nav">
+      <a href="https://github.com/alanturrr-1703/regex-practice" target="_blank" class="btn btn-outline">
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="home-main">
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Master Regular Expressions in Java</h1>
+    <p>12 concepts · 60 problems · failing tests · in-browser sandbox</p>
+    <div class="hero-badges">
+      <span class="badge badge-easy">20 Easy</span>
+      <span class="badge badge-medium">24 Medium</span>
+      <span class="badge badge-hard">16 Hard</span>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="filters-bar">
+    <div class="filter-group">
+      <label>Filter by difficulty:</label>
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="easy">Easy</button>
+      <button class="filter-btn" data-filter="medium">Medium</button>
+      <button class="filter-btn" data-filter="hard">Hard</button>
+    </div>
+    <div class="filter-group">
+      <input class="search-input" id="searchInput" type="text" placeholder="Search problems…" />
+    </div>
+  </section>
+
+  <!-- Concept grid -->
+  <section class="concept-grid" id="conceptGrid">
+    <!-- Rendered by JS -->
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Built with Piston API · Monaco Editor · Gradle + JUnit 5</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script>
+(function () {
+  let activeFilter = 'all';
+  let searchQuery  = '';
+
+  // Difficulty counts
+  const diffBadge = { easy: 'badge-easy', medium: 'badge-medium', hard: 'badge-hard' };
+
+  function renderGrid() {
+    const grid = document.getElementById('conceptGrid');
+    grid.innerHTML = '';
+
+    Object.entries(PROBLEMS).forEach(([conceptKey, concept]) => {
+      const matchingProblems = concept.problems.filter(p => {
+        const matchesDiff   = activeFilter === 'all' || p.difficulty === activeFilter;
+        const matchesSearch = p.title.toLowerCase().includes(searchQuery) ||
+                              p.description.toLowerCase().includes(searchQuery);
+        return matchesDiff && matchesSearch;
+      });
+      if (matchingProblems.length === 0) return;
+
+      const card = document.createElement('div');
+      card.className = 'concept-card';
+      card.innerHTML = `
+        <div class="concept-header" style="border-left: 3px solid ${concept.color}">
+          <div class="concept-title">${concept.label}</div>
+          <div class="concept-desc">${concept.description}</div>
+        </div>
+        <ul class="problem-list">
+          ${matchingProblems.map(p => `
+            <li class="problem-item">
+              <a href="solve.html?concept=${encodeURIComponent(conceptKey)}&id=${encodeURIComponent(p.id)}"
+                 class="problem-link">
+                <span class="problem-title">${p.title}</span>
+                <span class="badge ${diffBadge[p.difficulty]}">${p.difficulty}</span>
+              </a>
+            </li>
+          `).join('')}
+        </ul>
+      `;
+      grid.appendChild(card);
+    });
+
+    if (grid.innerHTML === '') {
+      grid.innerHTML = '<p class="no-results">No problems match your filter.</p>';
+    }
+  }
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      renderGrid();
+    });
+  });
+
+  // Search
+  document.getElementById('searchInput').addEventListener('input', e => {
+    searchQuery = e.target.value.toLowerCase();
+    renderGrid();
+  });
+
+  renderGrid();
+})();
+</script>
+</body>
+</html>
