@@ -4,37 +4,73 @@
   "description": "Java Regex deep-learning practice environment — 12 concepts, 60 problems",
   "main": "main.js",
   "scripts": {
-    "start":       "electron .",
-    "build":       "electron-builder --mac --win --linux",
-    "build:mac":   "electron-builder --mac",
-    "build:win":   "electron-builder --win",
+    "start": "electron .",
+    "build": "electron-builder --mac --win --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux"
   },
   "devDependencies": {
-    "electron":         "^28.3.3",
+    "electron": "^28.3.3",
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId":       "com.regex.practice",
+    "appId": "com.regex.practice",
     "productName": "Java Regex Practice",
-    "copyright":   "MIT",
+    "copyright": "MIT",
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
       "preload.js",
-      "docs/**/*"
+      "docs/**/*",
+      "topics/**/*",
+      "gradlew",
+      "gradlew.bat",
+      "gradle/**/*",
+      "settings.gradle",
+      "build.gradle"
+    ],
+    "asarUnpack": [
+      "topics/**/*",
+      "gradlew",
+      "gradlew.bat",
+      "gradle/**/*",
+      "settings.gradle",
+      "build.gradle"
     ],
     "mac": {
       "category": "public.app-category.education",
-      "target":   [{ "target": "dmg", "arch": ["x64", "arm64"] }]
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "linux": {
-      "target":   [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "category": "Education"
     }
   }

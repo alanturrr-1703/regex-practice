@@ -56,6 +56,20 @@ app.on("window-all-closed", () => {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve a path relative to the app root.
+ *
+ * When packaged:  files listed in asarUnpack live at
+ *   <app>/Contents/Resources/app.asar.unpacked/<...>
+ * In dev:         they sit right next to main.js (__dirname).
+ */
+function appPath(...parts) {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "app.asar.unpacked", ...parts);
+  }
+  return path.join(__dirname, ...parts);
+}
+
 function runCmd(cmd, options) {
   return new Promise((resolve) => {
     exec(cmd, { encoding: "utf8", ...options }, (err, stdout, stderr) => {
@@ -70,8 +84,7 @@ function runCmd(cmd, options) {
 
 /** Resolve a problem directory: topics/regex/concepts/{concept}/problems/{diff}/{id} */
 function problemDir(conceptKey, difficulty, problemId) {
-  return path.join(
-    __dirname,
+  return appPath(
     "topics",
     "regex",
     "concepts",
@@ -173,15 +186,21 @@ ipcMain.handle(
     }
 
     // 2. Run ./gradlew :<concept>:<difficulty>:<problem>:test
-    const gradlew = path.join(
-      __dirname,
+    const gradlew = appPath(
       process.platform === "win32" ? "gradlew.bat" : "gradlew",
     );
-    const task = `:${conceptKey}:${difficulty}:${problemId}:test`;
 
+    // Ensure gradlew is executable (asar.unpacked files may lose +x bit)
+    if (process.platform !== "win32") {
+      try {
+        fs.chmodSync(gradlew, "755");
+      } catch (_) {}
+    }
+
+    const task = `:${conceptKey}:${difficulty}:${problemId}:test`;
     const result = await runCmd(
       `"${gradlew}" ${task} --no-daemon --continue --rerun-tasks`,
-      { cwd: __dirname, timeout: 90_000 },
+      { cwd: appPath(), timeout: 90_000 },
     );
 
     // 3. Find and parse the JUnit XML report
@@ -255,14 +274,7 @@ ipcMain.handle("check-java", async () => {
 
 ipcMain.handle("read-markdown", (_event, { conceptKey, fileType }) => {
   const filename = fileType === "notes" ? "notes.md" : "README.md";
-  const filePath = path.join(
-    __dirname,
-    "topics",
-    "regex",
-    "concepts",
-    conceptKey,
-    filename,
-  );
+  const filePath = appPath("topics", "regex", "concepts", conceptKey, filename);
   try {
     return { content: fs.readFileSync(filePath, "utf8"), filename };
   } catch (e) {
