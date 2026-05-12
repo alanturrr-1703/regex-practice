@@ -1,0 +1,134 @@
+# Build and publish Electron desktop app for macOS, Windows, and Linux.
+# Triggered by pushing a version tag: git tag v1.0.0 && git push --tags
+#
+# Produces:
+#   macOS   → Java Regex Practice-{version}-arm64.dmg  (Apple Silicon)
+#             Java Regex Practice-{version}.dmg         (Intel x64)
+#   Windows → Java Regex Practice Setup {version}.exe
+#   Linux   → Java Regex Practice-{version}.AppImage
+
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+
+  # ── macOS (builds both arm64 and x64 DMGs) ─────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS DMG (arm64 + x64)
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-builds
+          path: dist/*.dmg
+
+  # ── Windows ────────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: dist/*.exe
+
+  # ── Linux ──────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux AppImage
+        run: npm run build:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: dist/*.AppImage
+
+  # ── Create GitHub Release with all binaries ───────────────────────────
+  release:
+    needs: [build-mac, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-all
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Java Regex Practice ${{ github.ref_name }}"
+          body: |
+            ## Download
+
+            | Platform | File |
+            |---|---|
+            | macOS (Apple Silicon) | `Java Regex Practice-*-arm64.dmg` |
+            | macOS (Intel)         | `Java Regex Practice-*.dmg` |
+            | Windows               | `Java Regex Practice Setup *.exe` |
+            | Linux                 | `Java Regex Practice-*.AppImage` |
+
+            **Requires Java 17+ installed on your machine.**
+
+            ### Docker (Java bundled)
+            ```
+            docker-compose up
+            ```
+            then open http://localhost:3000
+          files: dist-all/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}

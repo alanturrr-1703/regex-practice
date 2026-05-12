@@ -30,7 +30,7 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, "docs", "index.html"));
+  win.loadFile(path.join(__dirname, "docs", "app.html"));
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
