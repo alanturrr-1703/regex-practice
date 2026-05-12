@@ -1,24 +1,20 @@
 /**
  * runner.js — Code execution engine
  *
- * Three execution paths, tried in order:
+ * Three execution paths:
  *
- *  1. ELECTRON (desktop app)
- *     window.electronAPI.executeJava(source)
- *     → Electron main process: javac + java via child_process
- *     → Uses the user's local JDK, works offline
+ *  1. ELECTRON  → window.electronAPI.runGradleTests()
+ *     Writes code to Solution.java, runs ./gradlew :<path>:test,
+ *     parses the real JUnit XML — shows EVERY test in SolutionTest.java.
  *
- *  2. DOCKER / LOCAL SERVER  (http://localhost:3000)
- *     POST /execute  { code }
- *     → Express server inside the Docker container
- *     → OpenJDK 17 bundled in the image, no Java install needed
- *     → Only tried when window.location.hostname === 'localhost'
+ *  2. DOCKER / localhost:3000  → POST /execute
+ *     Custom harness built from data.js test cases.
+ *     (Gradle not available inside the lightweight Docker image)
  *
- *  3. GITHUB PAGES (static hosting)
- *     No execution available — shows install instructions
+ *  3. GitHub Pages  → install instructions
  */
 
-// ── Harness generator ─────────────────────────────────────────────────────────
+// ── Harness generator (Docker / localhost path only) ─────────────────────────
 
 function toStringExpr(returnType, call, customToString) {
   switch (returnType) {
@@ -76,35 +72,29 @@ import java.util.Optional;
 
 public class Main {
     static int _p = 0, _f = 0;
-
     static void check(String name, String expected, String actual) {
         String e = expected == null ? "null" : expected.trim();
         String a = actual   == null ? "null" : actual.trim();
-        if (e.equals(a)) {
-            System.out.println("PASS: " + name);
-            _p++;
-        } else {
+        if (e.equals(a)) { System.out.println("PASS: " + name); _p++; }
+        else {
             System.out.println("FAIL: " + name);
             System.out.println("  expected: " + e);
             System.out.println("  got:      " + a);
             _f++;
         }
     }
-
     public static void main(String[] args) {
         Solution sol = new Solution();
         try {
 ${testLines}
         } catch (UnsupportedOperationException e) {
-            System.out.println("NOT_IMPLEMENTED");
-            return;
+            System.out.println("NOT_IMPLEMENTED"); return;
         } catch (Exception e) {
             System.out.println("EXCEPTION: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         System.out.println("SUMMARY: " + _p + "/" + (_p + _f) + " passed");
     }
 }
-
 class Solution {
 ${indented}
 }
@@ -113,15 +103,24 @@ ${indented}
 
 // ── Execution router ─────────────────────────────────────────────────────────
 
-async function runInSandbox(problem, userCode) {
-  const javaSource = buildHarness(problem, userCode);
-
-  // ── Path 1: Electron desktop app ─────────────────────────────────────────
+/**
+ * @param {object} problem   — the problem object from PROBLEMS in data.js
+ * @param {string} userCode  — current Monaco editor content (full Solution.java in Electron,
+ *                             method body only in Docker / GitHub Pages)
+ * @param {object} ctx       — { conceptKey, difficulty, problemId } for Electron path
+ */
+async function runInSandbox(problem, userCode, ctx) {
+  // ── Path 1: Electron → Gradle (all tests from SolutionTest.java) ──────────
   if (window.electronAPI && window.electronAPI.isElectron) {
-    return await window.electronAPI.executeJava(javaSource);
+    return await window.electronAPI.runGradleTests({
+      conceptKey: ctx.conceptKey,
+      difficulty: ctx.difficulty,
+      problemId: ctx.problemId,
+      code: userCode, // full Solution.java content
+    });
   }
 
-  // ── Path 2: Docker / local execution server ───────────────────────────────
+  // ── Path 2: Docker / local server → harness ───────────────────────────────
   if (
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1"
@@ -130,14 +129,15 @@ async function runInSandbox(problem, userCode) {
       const resp = await fetch("/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: javaSource }),
+        body: JSON.stringify({ code: buildHarness(problem, userCode) }),
       });
-      if (resp.ok) return await resp.json();
-    } catch (_) {
-      // Server not running — fall through
-    }
+      if (resp.ok) {
+        const data = await resp.json();
+        return { mode: "harness", ...data };
+      }
+    } catch (_) {}
   }
 
-  // ── Path 3: GitHub Pages — no executor ───────────────────────────────────
-  return { output: "WEB_NO_EXECUTOR", error: "" };
+  // ── Path 3: GitHub Pages ──────────────────────────────────────────────────
+  return { mode: "none" };
 }

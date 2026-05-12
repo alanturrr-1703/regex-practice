@@ -1,26 +1,41 @@
 /**
- * preload.js — IPC bridge between the renderer (docs/) and the main process.
+ * preload.js — IPC bridge
  *
- * Exposes a minimal, safe API on window.electronAPI.
- * contextIsolation: true ensures the renderer cannot access Node.js directly.
+ * Exposes window.electronAPI to the renderer (docs/).
  */
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electronAPI', {
-
-  /**
-   * Execute a Java source string locally and return { output, error }.
-   * @param {string} javaCode  — the full Main.java source
-   * @returns {Promise<{output: string, error: string}>}
-   */
-  executeJava: (javaCode) => ipcRenderer.invoke('execute-java', javaCode),
-
-  /**
-   * Check if Java is installed and return { available: bool, version: string }.
-   */
-  checkJava: () => ipcRenderer.invoke('check-java'),
-
+contextBridge.exposeInMainWorld("electronAPI", {
   /** True when running inside Electron */
   isElectron: true,
+
+  /**
+   * Read the current Solution.java from disk.
+   * @returns {Promise<{code?: string, error?: string}>}
+   */
+  readSolution: ({ conceptKey, difficulty, problemId }) =>
+    ipcRenderer.invoke("read-solution", { conceptKey, difficulty, problemId }),
+
+  /**
+   * Write code to Solution.java and run the full Gradle test suite.
+   * Returns all test results from the real SolutionTest.java.
+   *
+   * @param {object} opts
+   * @param {string} opts.conceptKey  — e.g. "01_basics"
+   * @param {string} opts.difficulty  — "easy" | "medium" | "hard"
+   * @param {string} opts.problemId   — e.g. "detect-digit"
+   * @param {string} opts.code        — full Solution.java content
+   * @returns {Promise<{mode:'gradle', tests:Array, total:number, passed:number, failed:number, error?:string}>}
+   */
+  runGradleTests: ({ conceptKey, difficulty, problemId, code }) =>
+    ipcRenderer.invoke("run-gradle-test", {
+      conceptKey,
+      difficulty,
+      problemId,
+      code,
+    }),
+
+  /** Verify Java is installed. */
+  checkJava: () => ipcRenderer.invoke("check-java"),
 });

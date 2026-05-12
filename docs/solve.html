@@ -198,18 +198,45 @@
 
                 // ── Monaco editor ─────────────────────────────────────────────────────────
                 let editor;
-                const starterCode = problem.starterCode;
+                // Electron loads the real Solution.java from disk;
+                // other runtimes use the compact method stub from data.js
+                const defaultCode = problem.starterCode;
+                let initialCode = defaultCode;
+
+                // Context passed to runInSandbox for the Gradle path
+                const ctx = {
+                    conceptKey,
+                    difficulty:
+                        params.get("difficulty") || inferDifficulty(problem),
+                    problemId,
+                };
+
+                function inferDifficulty(p) {
+                    // Find this problem's difficulty from PROBLEMS tree
+                    const concept = PROBLEMS[conceptKey];
+                    if (!concept) return "easy";
+                    for (const diff of ["easy", "medium", "hard"]) {
+                        if (
+                            (concept.problems || []).find(
+                                (x) => x.id === p.id && x.difficulty === diff,
+                            )
+                        )
+                            return diff;
+                    }
+                    return p.difficulty || "easy";
+                }
 
                 require.config({
                     paths: {
                         vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs",
                     },
                 });
-                require(["vs/editor/editor.main"], function () {
+
+                async function initEditor(code) {
                     editor = monaco.editor.create(
                         document.getElementById("monacoContainer"),
                         {
-                            value: starterCode,
+                            value: code,
                             language: "java",
                             theme: "vs-dark",
                             fontSize: 14,
@@ -221,15 +248,40 @@
                             tabSize: 4,
                         },
                     );
-
                     document.getElementById("runBtn").disabled = false;
+                }
+
+                require(["vs/editor/editor.main"], async function () {
+                    if (window.electronAPI && window.electronAPI.isElectron) {
+                        // Load the actual Solution.java from disk
+                        const res = await window.electronAPI.readSolution({
+                            conceptKey,
+                            difficulty: ctx.difficulty,
+                            problemId,
+                        });
+                        initialCode = res.code || defaultCode;
+                    }
+                    await initEditor(initialCode);
                 });
 
-                // Reset
+                // Reset — back to whatever was on disk (or data.js stub)
                 document
                     .getElementById("resetBtn")
-                    .addEventListener("click", () => {
-                        if (editor) editor.setValue(starterCode);
+                    .addEventListener("click", async () => {
+                        if (!editor) return;
+                        if (
+                            window.electronAPI &&
+                            window.electronAPI.isElectron
+                        ) {
+                            const res = await window.electronAPI.readSolution({
+                                conceptKey,
+                                difficulty: ctx.difficulty,
+                                problemId,
+                            });
+                            editor.setValue(res.code || defaultCode);
+                        } else {
+                            editor.setValue(defaultCode);
+                        }
                         document.getElementById("resultsPanel").style.display =
                             "none";
                     });
@@ -257,17 +309,12 @@
                         summary.textContent = "";
 
                         try {
-                            const { output, error } = await runInSandbox(
+                            const result = await runInSandbox(
                                 problem,
                                 userCode,
+                                ctx,
                             );
-                            renderResults(
-                                output,
-                                error,
-                                problem.tests,
-                                resultsBody,
-                                summary,
-                            );
+                            renderResults(result, resultsBody, summary);
                         } catch (e) {
                             resultsBody.innerHTML = `<div class="result-error">Network error: ${e.message}</div>`;
                         }
@@ -307,44 +354,72 @@
                         .replace(/>/g, "&gt;");
                 }
 
-                function renderResults(
-                    output,
-                    compileErr,
-                    tests,
-                    body,
-                    summary,
-                ) {
-                    if (compileErr) {
-                        body.innerHTML = `<div class="result-error"><strong>Compile error:</strong><pre>${escHtml(compileErr)}</pre></div>`;
+                // ── renderResults: handles gradle, harness, and none modes ────────────────
+                function renderResults(result, body, summary) {
+                    // ── mode: none (GitHub Pages) ─────────────────────────────────────────
+                    if (!result || result.mode === "none") {
+                        body.innerHTML = `
+          <div class="result-not-impl" style="line-height:1.9">
+            <strong>⚙ Code execution needs a runtime — choose one:</strong><br><br>
+            <b>🖥 Desktop app</b> (uses your local JDK, shows all tests)<br>
+            <code style="font-size:12px">npm install &amp;&amp; npm start</code><br><br>
+            <b>🐳 Docker</b> (Java 17 bundled)<br>
+            <code style="font-size:12px">docker-compose up</code>
+            → <a href="http://localhost:3000" target="_blank">localhost:3000</a>
+          </div>`;
+                        summary.innerHTML =
+                            '<span class="warn-text">⚙ No runtime</span>';
+                        return;
+                    }
+
+                    // ── mode: gradle (Electron — real JUnit results) ──────────────────────
+                    if (result.mode === "gradle") {
+                        if (result.error) {
+                            body.innerHTML = `<div class="result-error"><strong>Compile / build error:</strong><pre>${escHtml(result.error)}</pre></div>`;
+                            summary.innerHTML =
+                                '<span class="fail-text">✗ Build error</span>';
+                            return;
+                        }
+                        const rows = (result.tests || [])
+                            .map((t) => {
+                                if (t.passed) {
+                                    return `<div class="result-row pass"><span class="result-icon">✓</span><span>${escHtml(t.displayName)}</span></div>`;
+                                } else {
+                                    const msg = t.message
+                                        ? `<pre class="diff-pre">${escHtml(t.message)}</pre>`
+                                        : "";
+                                    return `<div class="result-row fail"><span class="result-icon">✗</span><div><div>${escHtml(t.displayName)}</div>${msg}</div></div>`;
+                                }
+                            })
+                            .join("");
+                        body.innerHTML =
+                            rows ||
+                            '<div class="running-msg">No test results found.</div>';
+                        const p = result.passed || 0,
+                            f = result.failed || 0,
+                            tot = result.total || p + f;
+                        summary.innerHTML =
+                            f === 0 && tot > 0
+                                ? `<span class="pass-text">✓ All ${tot} tests passed</span>`
+                                : `<span class="fail-text">${p}/${tot} tests passed</span>`;
+                        return;
+                    }
+
+                    // ── mode: harness (Docker) — parse PASS:/FAIL: lines ─────────────────
+                    const { output, error } = result;
+                    if (error) {
+                        body.innerHTML = `<div class="result-error"><strong>Compile error:</strong><pre>${escHtml(error)}</pre></div>`;
                         summary.innerHTML =
                             '<span class="fail-text">✗ Compile error</span>';
                         return;
                     }
-
                     const lines = (output || "").split("\n");
-
-                    if (lines.some((l) => l.includes("WEB_NO_EXECUTOR"))) {
-                        body.innerHTML = `
-        <div class="result-not-impl" style="line-height:1.9">
-          <strong>⚙ Code execution needs a runtime — choose one:</strong><br><br>
-          <b>🖥 Desktop app</b> (uses your local JDK)<br>
-          <code style="font-size:12px">npm install &amp;&amp; npm start</code><br><br>
-          <b>🐳 Docker</b> (Java 17 bundled, no install needed)<br>
-          <code style="font-size:12px">docker-compose up</code>
-          then open <a href="http://localhost:3000" target="_blank">localhost:3000</a>
-        </div>`;
-                        summary.innerHTML =
-                            '<span class="warn-text">⚙ No runtime here</span>';
-                        return;
-                    }
-
                     if (lines.some((l) => l.includes("NOT_IMPLEMENTED"))) {
                         body.innerHTML = `<div class="result-not-impl">⚠ Method not yet implemented — replace the <code>throw</code> with your solution.</div>`;
                         summary.innerHTML =
                             '<span class="warn-text">Not implemented</span>';
                         return;
                     }
-
                     if (lines.some((l) => l.startsWith("EXCEPTION:"))) {
                         const msg =
                             lines.find((l) => l.startsWith("EXCEPTION:")) || "";
@@ -353,14 +428,11 @@
                             '<span class="fail-text">✗ Runtime error</span>';
                         return;
                     }
-
-                    // Parse PASS/FAIL lines
                     const rows = lines.filter(
                         (l) => l.startsWith("PASS:") || l.startsWith("FAIL:"),
                     );
                     let passed = 0,
                         failed = 0;
-
                     const rowsHtml = rows
                         .map((line) => {
                             if (line.startsWith("PASS:")) {
@@ -376,17 +448,14 @@
                             }
                         })
                         .join("");
-
                     body.innerHTML =
                         rowsHtml ||
                         `<pre class="raw-output">${escHtml(output)}</pre>`;
-
                     const total = passed + failed;
-                    if (failed === 0 && total > 0) {
-                        summary.innerHTML = `<span class="pass-text">✓ All ${total} tests passed</span>`;
-                    } else {
-                        summary.innerHTML = `<span class="fail-text">${passed}/${total} tests passed</span>`;
-                    }
+                    summary.innerHTML =
+                        failed === 0 && total > 0
+                            ? `<span class="pass-text">✓ All ${total} tests passed</span>`
+                            : `<span class="fail-text">${passed}/${total} tests passed</span>`;
                 }
             })();
         </script>

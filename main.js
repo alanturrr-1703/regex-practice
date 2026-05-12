@@ -1,50 +1,43 @@
 /**
  * main.js — Electron main process
  *
- * Responsibilities:
- *  1. Create the browser window and load the docs/ frontend
- *  2. Handle 'execute-java' IPC calls from the renderer:
- *       - Write the harness Java source to a temp dir
- *       - Compile with javac
- *       - Run with java
- *       - Return { output, error } to the renderer
- *  3. Open external links (GitHub) in the system browser
+ * IPC handlers:
+ *  'read-solution'    → read the current Solution.java content from disk
+ *  'run-gradle-test'  → write code to Solution.java, run ./gradlew :<path>:test,
+ *                       parse JUnit XML, return all test results
+ *  'check-java'       → verify java is on PATH
  */
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const path  = require('path');
-const fs    = require('fs');
-const os    = require('os');
-const { exec } = require('child_process');
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
+const { exec } = require("child_process");
 
 // ── Window ─────────────────────────────────────────────────────────────────
 
 function createWindow() {
   const win = new BrowserWindow({
-    width:  1440,
+    width: 1440,
     height: 900,
-    minWidth:  900,
+    minWidth: 900,
     minHeight: 600,
-    title: 'Java Regex Practice',
+    title: "Java Regex Practice",
     webPreferences: {
-      preload:          path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration:  false,
+      nodeIntegration: false,
     },
   });
 
-  // Load the frontend
-  win.loadFile(path.join(__dirname, 'docs', 'index.html'));
+  win.loadFile(path.join(__dirname, "docs", "index.html"));
 
-  // Open external links (e.g. GitHub button) in system browser, not in Electron
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
-    return { action: 'deny' };
+    return { action: "deny" };
   });
-
-  win.webContents.on('will-navigate', (event, url) => {
-    // Allow navigation within docs/ (file:// links)
-    if (!url.startsWith('file://')) {
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith("file://")) {
       event.preventDefault();
       shell.openExternal(url);
     }
@@ -53,96 +46,205 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-  app.on('activate', () => {
+  app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
 });
 
-// ── Java execution IPC handler ─────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Runs a shell command and resolves with { code, stdout, stderr }.
- * Never rejects — errors are captured in the resolved object.
- */
 function runCmd(cmd, options) {
-  return new Promise(resolve => {
-    exec(cmd, { encoding: 'utf8', ...options }, (err, stdout, stderr) => {
+  return new Promise((resolve) => {
+    exec(cmd, { encoding: "utf8", ...options }, (err, stdout, stderr) => {
       resolve({
-        code:   err ? (err.code || 1) : 0,
-        stdout: stdout || '',
-        stderr: stderr || '',
+        code: err ? err.code || 1 : 0,
+        stdout: stdout || "",
+        stderr: stderr || "",
       });
     });
   });
 }
 
-/**
- * Finds the path to javac/java.
- * On macOS/Linux the JAVA_HOME env var is often set; on Windows too.
- * Falls back to just 'javac'/'java' (assumes they're on PATH).
- */
-function javaBin(name) {
-  const javaHome = process.env.JAVA_HOME;
-  if (javaHome) {
-    const bin = path.join(javaHome, 'bin', name);
-    if (fs.existsSync(bin)) return `"${bin}"`;
-  }
-  return name; // rely on PATH
+/** Resolve a problem directory: topics/regex/concepts/{concept}/problems/{diff}/{id} */
+function problemDir(conceptKey, difficulty, problemId) {
+  return path.join(
+    __dirname,
+    "topics",
+    "regex",
+    "concepts",
+    conceptKey,
+    "problems",
+    difficulty,
+    problemId,
+  );
 }
 
-ipcMain.handle('execute-java', async (_event, javaCode) => {
-  // Create an isolated temp directory for this execution
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'regex-sandbox-'));
-  const srcFile = path.join(tmpDir, 'Main.java');
+function solutionFile(conceptKey, difficulty, problemId) {
+  return path.join(
+    problemDir(conceptKey, difficulty, problemId),
+    "src",
+    "main",
+    "java",
+    "com",
+    "example",
+    "Solution.java",
+  );
+}
 
-  try {
-    // 1. Write source
-    fs.writeFileSync(srcFile, javaCode, 'utf8');
+// ── Parse JUnit XML ─────────────────────────────────────────────────────────
 
-    // 2. Compile
-    const javac = javaBin('javac');
-    const compile = await runCmd(
-      `${javac} "${srcFile}"`,
-      { cwd: tmpDir, timeout: 20_000 }
-    );
+/**
+ * Parses a JUnit XML report into an array of { name, displayName, passed, message }.
+ * No external XML library needed — regex-based is sufficient for well-formed JUnit output.
+ */
+function parseJUnitXml(xml) {
+  const tests = [];
+  // Match both self-closing <testcase .../> and <testcase ...>...</testcase>
+  const re = /<testcase\s([^>]+?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const attrs = m[1] || "";
+    const body = m[2] || "";
+    const nameRaw = (attrs.match(/name="([^"]+)"/) || [])[1] || "unknown";
+    const failed = body.includes("<failure") || body.includes("<error");
+    let message = "";
+    if (failed) {
+      // Extract the human-readable part of the failure message
+      const msgMatch =
+        body.match(/message="([^"]*)"/) ||
+        body.match(/<failure[^>]*>([\s\S]*?)<\/failure>/);
+      if (msgMatch)
+        message = msgMatch[1]
+          .replace(/&#10;/g, "\n")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .slice(0, 300);
+    }
+    tests.push({
+      name: nameRaw,
+      displayName: camelToWords(nameRaw.replace(/^test/, "")),
+      passed: !failed,
+      message,
+    });
+  }
+  return tests;
+}
 
-    if (compile.code !== 0) {
-      return { output: '', error: compile.stderr || compile.stdout };
+function camelToWords(s) {
+  return s
+    .replace(/([A-Z])/g, " $1")
+    .toLowerCase()
+    .replace(/^\s+/, "");
+}
+
+// ── IPC: read current Solution.java ─────────────────────────────────────────
+
+ipcMain.handle(
+  "read-solution",
+  (_event, { conceptKey, difficulty, problemId }) => {
+    try {
+      return {
+        code: fs.readFileSync(
+          solutionFile(conceptKey, difficulty, problemId),
+          "utf8",
+        ),
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
+  },
+);
+
+// ── IPC: write + run Gradle tests ───────────────────────────────────────────
+
+ipcMain.handle(
+  "run-gradle-test",
+  async (_event, { conceptKey, difficulty, problemId, code }) => {
+    const solFile = solutionFile(conceptKey, difficulty, problemId);
+
+    // 1. Write the user's code to Solution.java
+    try {
+      fs.writeFileSync(solFile, code, "utf8");
+    } catch (e) {
+      return { error: `Cannot write Solution.java: ${e.message}` };
     }
 
-    // 3. Run
-    const java = javaBin('java');
-    const run = await runCmd(
-      `${java} -cp "${tmpDir}" Main`,
-      { cwd: tmpDir, timeout: 12_000 }
+    // 2. Run ./gradlew :<concept>:<difficulty>:<problem>:test
+    const gradlew = path.join(
+      __dirname,
+      process.platform === "win32" ? "gradlew.bat" : "gradlew",
+    );
+    const task = `:${conceptKey}:${difficulty}:${problemId}:test`;
+
+    const result = await runCmd(
+      `"${gradlew}" ${task} --no-daemon --continue --rerun-tasks`,
+      { cwd: __dirname, timeout: 90_000 },
     );
 
-    return {
-      output: run.stdout + (run.stderr || ''),
-      error:  '',
-    };
+    // 3. Find and parse the JUnit XML report
+    const xmlDir = path.join(
+      problemDir(conceptKey, difficulty, problemId),
+      "build",
+      "test-results",
+      "test",
+    );
 
-  } catch (err) {
-    return { output: '', error: String(err) };
-  } finally {
-    // Clean up temp files
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
-  }
-});
+    try {
+      const xmlFiles = fs.readdirSync(xmlDir).filter((f) => f.endsWith(".xml"));
+      if (xmlFiles.length === 0) throw new Error("no XML");
+      const xml = fs.readFileSync(path.join(xmlDir, xmlFiles[0]), "utf8");
+      const tests = parseJUnitXml(xml);
 
-// ── Java availability check ────────────────────────────────────────────────
+      // Extract totals from <testsuite> attributes
+      const tsMatch = xml.match(
+        /<testsuite[^>]+tests="(\d+)"[^>]*failures="(\d+)"[^>]*errors="(\d+)"/,
+      );
+      const total = tsMatch ? parseInt(tsMatch[1]) : tests.length;
+      const failures = tsMatch
+        ? parseInt(tsMatch[2]) + parseInt(tsMatch[3])
+        : tests.filter((t) => !t.passed).length;
 
-ipcMain.handle('check-java', async () => {
-  const result = await runCmd(`${javaBin('java')} -version`, { timeout: 5000 });
-  // java -version prints to stderr by convention
-  const combined = result.stdout + result.stderr;
+      return {
+        mode: "gradle",
+        tests,
+        total,
+        passed: total - failures,
+        failed: failures,
+      };
+    } catch (_) {
+      // XML not found → compile error. Surface Gradle output.
+      const output = result.stdout + result.stderr;
+      // Extract just the compile error section
+      const compileErr = extractCompileError(output);
+      return { mode: "gradle", error: compileErr || output.slice(-2000) };
+    }
+  },
+);
+
+function extractCompileError(gradleOutput) {
+  // Gradle wraps javac errors in lines starting with "> Task :..."
+  const lines = gradleOutput.split("\n");
+  const errLines = lines.filter(
+    (l) =>
+      l.includes("error:") ||
+      l.includes(".java:") ||
+      l.includes("FAILED") ||
+      l.includes("Compilation failed"),
+  );
+  return errLines.length ? errLines.join("\n") : "";
+}
+
+// ── IPC: check Java ─────────────────────────────────────────────────────────
+
+ipcMain.handle("check-java", async () => {
+  const r = await runCmd("java -version", { timeout: 5000 });
+  const combined = r.stdout + r.stderr;
   const match = combined.match(/version "([^"]+)"/);
   return {
-    available: result.code === 0,
-    version:   match ? match[1] : combined.slice(0, 80),
+    available: r.code === 0,
+    version: match ? match[1] : combined.slice(0, 80),
   };
 });
